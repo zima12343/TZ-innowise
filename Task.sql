@@ -297,4 +297,75 @@ RETURN 0
 
 DECLARE @rv varchar(30)
 exec sp_TransferMoney 2, 5404365883659243, 10, @rv OUTPUT
-SELECT @rv
+SELECT @rv;
+
+
+
+	-- Задание 7
+
+	CREATE TRIGGER tr_Account_Update --Предполагается, что при Insert будут использоваться Default значения 
+	ON [Accounts]
+	INSTEAD OF UPDATE
+	AS 
+	DECLARE @IdAccount int
+	DECLARE @Sum numeric(8,2)
+	DECLARE @ClientId int
+	DECLARE @AccountNumber varchar(50)
+	DECLARE @BankId int
+
+	SELECT  @IdAccount = IdAccount, 
+			@Sum = Balance,
+			@ClientId = ClientId,
+			@AccountNumber = AccountNumber,
+			@BankId = BankId
+	FROM inserted
+	IF(SELECT SUM(Balance) 
+		FROM Cards 
+		WHERE AccountId = @IdAccount) <= @Sum 
+	UPDATE Accounts 
+	SET Balance = @Sum,
+		ClientId = @ClientId,
+		AccountNumber = @AccountNumber,
+		BankId = @BankId
+	WHERE IdAccount = @IdAccount 
+
+
+	SELECT * FROM Accounts
+	WHERE IdAccount = 1
+	BEGIN TRANSACTION TR1
+	UPDATE Accounts SET Balance = 0
+	WHERE IdAccount = 1
+	ROLLBACK TRANSACTION TR1
+
+	--Триггер для Cards
+
+	CREATE TRIGGER tr_Cards_Update --Предполагается, что при Insert будут использоваться Default значения 
+	ON [Cards]
+	INSTEAD OF UPDATE
+	AS 
+	DECLARE @CardNumber numeric(16,0)
+	DECLARE @Sum numeric(8,2)
+	DECLARE @AccountId int
+	SELECT  @CardNumber = CardNumber, 
+			@Sum = Balance,
+			@AccountId = AccountId
+	FROM inserted
+	IF(  (SELECT SUM(Balance)+ @Sum 
+			FROM Cards 
+			WHERE AccountId = @AccountId AND CardNumber <> @CardNumber) <= (SELECT Balance 
+																			FROM Accounts 
+																			WHERE IdAccount = @AccountId))
+		UPDATE Cards 
+		SET Balance = @Sum
+		WHERE CardNumber = @CardNumber 
+	ELSE
+		PRINT('Ошибка суммы')
+
+
+	SELECT * FROM Cards where CardNumber = 5404361197558981
+	BEGIN TRANSACTION TR1
+
+	UPDATE Cards SET Balance = 5000
+	WHERE CardNumber = 5404361197558981
+
+	ROLLBACK TRANSACTION TR1
